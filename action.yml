@@ -4,3 +4,11 @@ author: Narottam Sahu
 branding:
   icon: 'airplay'
   color: 'blue'
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    # TODO: add the default directory - COMMENT IF IT'S NOT IN SUBFOLDER
+    defaults:
+       run:
+         working-directory: ./yacd
