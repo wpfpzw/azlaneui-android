@@ -72,7 +72,7 @@ jobs:
           base64 -d android/release.jks.base64 > android/release.decrypted.jks
 
       - name: Sign dev build
-        run: jarsigner -keystore android/release.decrypted.jks -storepass "${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" ./android/app/build/outputs/apk/release/app-release-unsigned.apk release && zipalign 4 ./android/app/build/outputs/apk/release/app-release-unsigned.apk app-release-signed.apk
+        run: jarsigner -keystore android/release.decrypted.jks -storepass "${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" ./android/app/build/outputs/apk/release/app-release-unsigned.apk release && zipalign 4 ./android/app/build/outputs/apk/release/app-release-unsigned.apk ./app-release-signed.apk && cp ./app-release-signed.apk ./android/app/build/outputs/apk/release/app-release-signed.apk
 
       - name: Set Tag
         id: current-datetime
