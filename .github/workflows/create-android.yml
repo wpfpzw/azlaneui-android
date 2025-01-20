@@ -22,7 +22,7 @@ jobs:
           submodules: 'true' 
         
       - name: Install HUB
-        run: sudo apt-get update && sudo apt-get install -y hub
+        run: sudo apt-get update && sudo apt-get install -y hub && sudo apt-get -y install zipalign
           
       - name: Setup java
         uses: actions/setup-java@v3
