@@ -16,11 +16,11 @@ jobs:
           ref: master
 
       - name: Setup python and check version
-      - uses: actions/setup-python@v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           cache: 'pip'
-      - run: |
+        run: |
           pip install -r requirements.txt
           python version_check.py
 
