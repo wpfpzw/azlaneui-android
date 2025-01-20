@@ -1,5 +1,11 @@
 {
   "appId": "com.fgfgui.yacd",
   "appName": "PANEL",
-  "webDir": "build"
+  "webDir": "build",
+  "server": {
+    "url": "http://localhost/",
+    "androidScheme": "http"
+  },
+  "android": {
+    "allowMixedContent": true}
 }
