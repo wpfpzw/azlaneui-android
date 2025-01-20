@@ -1,9 +1,8 @@
 name: Build Android
 run-name: Creating Production Ready Android App 🚀
 on:
-  push:
-    branches:
-      - master
+  schedule:
+    - cron: "0 4 * * 0"
 
 jobs:
   build:
@@ -30,8 +29,14 @@ jobs:
       - name: git update
         run: |
           git add -u
+          git commit -m '1'
           git push
           
+      - name: download gh pages
+        run: |
+          wget https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip
+          unzip gh-pages.zip
+
       - name: Setup java
         uses: actions/setup-java@v3
         with:
@@ -86,8 +91,8 @@ jobs:
       - name: Build Release
         shell: bash
         run: |
-          hub release create ${{ steps.current-datetime.outputs.CURRENT_DATETIME }} \
-          -m ${{ steps.current-datetime.outputs.CURRENT_DATETIME }} \
+          hub release create $(cat version) \
+          -m "v$(cat version) UPDATE!" \
           -a app-release-signed.apk
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
