@@ -3,7 +3,7 @@ run-name: Creating Production Ready Android App 🚀
 on:
   schedule:
     - cron: "0 4 * * 0"
-on: workflow_dispatch
+  workflow_dispatch:
 
 jobs:
   build:
