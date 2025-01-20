@@ -9,20 +9,28 @@ jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
-    # TODO: add the default directory - COMMENT IF IT'S NOT IN SUBFOLDER
-    # defaults:
-    #   run:
-    #     working-directory: ./frontend
     steps:
       - name: Checkout source
         uses: actions/checkout@v3
-        # TODO: add your branch to checkout
         with:
           ref: master
-          submodules: 'true' 
-        
+
+      - name: Setup python and check version
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      - run: |
+          pip install -r requirements.txt
+          python version_check.py
+
       - name: Install HUB
-        run: sudo apt-get update && sudo apt-get install -y hub && sudo apt-get -y install zipalign
+        run: sudo apt-get update && sudo apt-get install -y hub zipalign git
+
+      - name: git update
+        run: |
+          git add -u
+          git push
           
       - name: Setup java
         uses: actions/setup-java@v3
@@ -37,15 +45,6 @@ jobs:
 
       - name: install dependencies
         run: npm ci	
-
-      - name: install pnpm
-        run: npm install -g pnpm@latest-10
-
-      - name: build metacubed
-        run: |
-          pnpm install
-          pnpm build
-        working-directory: ./metacubexd
 
       - name: Add android folder if not present
         run: if [ ! -d "./android" ]; then npx cap add android; fi
