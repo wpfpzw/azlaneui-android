@@ -3,7 +3,6 @@
   "appName": "PANEL",
   "webDir": "build",
   "server": {
-    "url": "http://localhost/",
     "androidScheme": "http"
   },
   "android": {
