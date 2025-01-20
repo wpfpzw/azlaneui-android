@@ -1,7 +1,7 @@
 {
   "appId": "com.fgfgui.yacd",
   "appName": "PANEL",
-  "webDir": "build",
+  "webDir": "metacubexd/dist",
   "server": {
     "androidScheme": "http"
   },
