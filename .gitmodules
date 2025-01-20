@@ -1,3 +1,7 @@
 [submodule "metacubexd"]
 	path = metacubexd
 	url = https://github.com/MetaCubeX/metacubexd.git
+[submodule "dist"]
+	path = dist
+	url = https://github.com/MetaCubeX/metacubexd.git
+	branch = gh-pages
