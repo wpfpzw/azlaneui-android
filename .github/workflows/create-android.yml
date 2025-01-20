@@ -30,10 +30,15 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y hub zipalign git
 
       - name: git update
+        shell: bash
         run: |
+          git config --global user.email fgfgui_link@outlook.com
+          git config --global user.name link-fgfgui
           git add -u
           git commit -m '1'
-          git push
+          hub push origin
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           
       - name: download gh pages
         run: |
