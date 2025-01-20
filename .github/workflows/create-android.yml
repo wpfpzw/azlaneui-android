@@ -49,7 +49,14 @@ jobs:
       # TODO: Check for folder structure in README for generating splash screen 
       - name: Generate icons and splash screen to android folder 
         run:  if [ -d "./resources" ]; then npm install @capacitor/assets --save-dev && npx capacitor-assets generate --android; fi
-        
+
+
+      - name: andman
+        run: rm android/app/src/main/AndroidManifest.xml
+
+      - name: andman
+        run: cp AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+
       - name: Build app bundle
         run: cd android && ./gradlew bundle && ./gradlew assembleDebug
 
