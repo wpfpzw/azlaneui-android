@@ -15,31 +15,9 @@ jobs:
         with:
           ref: master
 
-      - name: Setup python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-          cache: 'pip'
-
-      - name: check version
-        run: |
-          pip install -r requirements.txt
-          python version_check.py
-
       - name: Install HUB
-        run: sudo apt-get update && sudo apt-get install -y hub zipalign git
+        run: sudo apt-get update && sudo apt-get install -y hub zipalign apksigner
 
-      - name: git update
-        shell: bash
-        run: |
-          git config --global user.email fgfgui_link@outlook.com
-          git config --global user.name link-fgfgui
-          git add -u
-          git commit -m '1'
-          hub push origin
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-          
       - name: download gh pages
         run: |
           wget https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip
@@ -84,7 +62,13 @@ jobs:
           base64 -d android/release.jks.base64 > android/release.decrypted.jks
 
       - name: Sign dev build
-        run: jarsigner -keystore android/release.decrypted.jks -storepass "${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" ./android/app/build/outputs/apk/release/app-release-unsigned.apk release && zipalign 4 ./android/app/build/outputs/apk/release/app-release-unsigned.apk ./app-release-signed.apk && cp ./app-release-signed.apk ./android/app/build/outputs/apk/release/app-release-signed.apk
+        run: |
+          zipalign 4 ./android/app/build/outputs/apk/release/app-release-unsigned.apk ./android/app/build/outputs/apk/release/app-release-unsigned-aligned.apk 
+          apksigner sign --ks android/release.decrypted.jks \
+          --ks-key-alias release \
+          --ks-pass ${{ secrets.RELEASE_KEYSTORE_PASSWORD }} \
+          --out ./android/app/build/outputs/apk/release/app-release-signed.apk \
+          ./android/app/build/outputs/apk/release/app-release-unsigned-aligned.apk
 
       - name: Set Tag
         id: current-datetime
@@ -99,8 +83,8 @@ jobs:
       - name: Build Release
         shell: bash
         run: |
-          hub release create $(cat version) \
-          -m "v$(cat version) UPDATE!" \
+          hub release create ${{ steps.current-datetime.outputs.CURRENT_DATETIME }} \
+          -m ${{ steps.current-datetime.outputs.CURRENT_DATETIME }} \
           -a app-release-signed.apk
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
