@@ -1,3 +1,10 @@
+# Auto converting panels to apk
+
+**如果版本不是最新,你可以通过开启一个issue来获取最新构建**
+
+
+原README内容:
+
 ![Banner](https://res.cloudinary.com/https-webdrip-in/image/upload/v1684903509/hackathon-github_wa82y1.png)
 
 ## Description
