@@ -66,7 +66,7 @@ jobs:
           zipalign 4 ./android/app/build/outputs/apk/release/app-release-unsigned.apk ./android/app/build/outputs/apk/release/app-release-unsigned-aligned.apk 
           apksigner sign --ks android/release.decrypted.jks \
           --ks-key-alias release \
-          --ks-pass ${{ secrets.RELEASE_KEYSTORE_PASSWORD }} \
+          --ks-pass pass:${{ secrets.RELEASE_KEYSTORE_PASSWORD }} \
           --out ./android/app/build/outputs/apk/release/app-release-signed.apk \
           ./android/app/build/outputs/apk/release/app-release-unsigned-aligned.apk
 
@@ -85,6 +85,6 @@ jobs:
         run: |
           hub release create ${{ steps.current-datetime.outputs.CURRENT_DATETIME }} \
           -m ${{ steps.current-datetime.outputs.CURRENT_DATETIME }} \
-          -a app-release-signed.apk
+          -a ./android/app/build/outputs/apk/release/app-release-signed.apk
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
