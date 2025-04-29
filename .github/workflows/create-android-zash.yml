@@ -1,5 +1,5 @@
 name: Build Android zash
-run-name: Creating Production Ready Android App 🚀 Z
+run-name: Creating Production Ready Android App 🚀 M
 on:
   workflow_dispatch:
 
@@ -13,13 +13,9 @@ jobs:
         with:
           ref: zash
 
-      - name: Install HUB
-        run: sudo apt-get update && sudo apt-get install -y hub zipalign apksigner
+      - name: Install Build Tools and jq
+        run: sudo apt-get update && sudo apt-get install -y hub zipalign apksigner jq
 
-      - name: download gh pages
-        run: |
-          wget https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip
-          unzip dist.zip
       - name: Setup java
         uses: actions/setup-java@v3
         with:
@@ -31,143 +27,155 @@ jobs:
         with:
           node-version: 19.x
 
-      - name: install dependencies
-        run: npm ci	
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Add android folder if not present
-        run: if [ ! -d "./android" ]; then npx cap add android; fi
+      - name: Download and prepare web assets (zashcubexd dist)
+        run: |
+          echo "Downloading gh-pages..."
+          wget https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip
+          echo "Unzipping dist..."
+          unzip -q dist.zip
+          EXTRACTED_DIR="dist"
+          WEB_DIR="dist"
+          echo "Preparing $WEB_DIR directory..."
+          rm -rf $WEB_DIR
+          mkdir -p $WEB_DIR
+          echo "Moving assets from $EXTRACTED_DIR to $WEB_DIR..."
+          if [ -d "$EXTRACTED_DIR/dist" ]; then
+            mv $EXTRACTED_DIR/dist/* $WEB_DIR/
+          else
+            shopt -s dotglob
+            mv $EXTRACTED_DIR/* $WEB_DIR/
+            shopt -u dotglob
+          fi
+          echo "Cleaning up downloaded files..."
+          rm gh-pages.zip
+          rm -rf $EXTRACTED_DIR
+          echo "Contents of $WEB_DIR:"
+          ls -l $WEB_DIR
 
-      - name: Capacitor update
-        run: npx cap update
+      - name: Clean Android Directory Before Add/Sync
+        run: |
+          if [ -d "android" ]; then
+            echo "Existing 'android' directory found. Removing it to ensure clean add/sync..."
+            rm -rf android/
+            echo "'android' directory removed."
+          else
+            echo "'android' directory not found. Proceeding."
+          fi
 
-      - name: Capacitor copy
-        run: npx cap copy
+      - name: Explicitly Add Android Platform
+        run: npx cap add android
 
-      - name: Generate icons and splash screen to android folder 
-        run:  if [ -d "./resources" ]; then npm install @capacitor/assets --save-dev && npx capacitor-assets generate --android; fi
+
+      - name: Capacitor Sync Android
+        run: npx cap sync android 
+
+      - name: Generate icons and splash screen to android folder
+        run: if [ -d "./resources" ]; then npm install @capacitor/assets --save-dev && npx capacitor-assets generate --android; fi
 
       - name: AndroidManifestModify
-        run: rm android/app/src/main/AndroidManifest.xml && cp AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+        run: |
+          if [ -f "AndroidManifest.xml" ]; then
+            echo "Copying custom AndroidManifest.xml"
+            cp AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          else
+            echo "Custom AndroidManifest.xml not found, using default."
+          fi
 
-      - name: Build app
+      - name: Build unsigned app
         run: cd android && ./gradlew assembleRelease
 
       - name: Extract Android signing key from env
         run: |
           echo "${{ secrets.RELEASE_KEYSTORE }}" > android/release.jks.base64
           base64 -d android/release.jks.base64 > android/release.decrypted.jks
-      - name: Sign dev build
+
+      - name: Sign release build
         run: |
-          zipalign 4 ./android/app/build/outputs/apk/release/app-release-unsigned.apk ./android/app/build/outputs/apk/release/app-release-unsigned-aligned.apk 
-          apksigner sign --ks android/release.decrypted.jks \
-          --ks-key-alias release \
-          --ks-pass pass:${{ secrets.RELEASE_KEYSTORE_PASSWORD }} \
-          --out ./android/app/build/outputs/apk/release/app-release-signed.apk \
-          ./android/app/build/outputs/apk/release/app-release-unsigned-aligned.apk
-      - name: Set Tag
+          UNSIGNED_APK="./android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          ALIGNED_APK="./android/app/build/outputs/apk/release/app-release-unsigned-aligned.apk"
+          SIGNED_APK="./android/app/build/outputs/apk/release/app-release-signed.apk"
+          echo "Aligning $UNSIGNED_APK..."
+          zipalign -v 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+          echo "Signing $ALIGNED_APK..."
+          apksigner sign \
+            --ks android/release.decrypted.jks \
+            --ks-key-alias release \
+            --ks-pass pass:${{ secrets.RELEASE_KEYSTORE_PASSWORD }} \
+            --out "$SIGNED_APK" \
+            "$ALIGNED_APK"
+          echo "Signed APK created at $SIGNED_APK"
+          ls -l ./android/app/build/outputs/apk/release/
+
+      - name: Fetch Latest Tag from zashboard
+        id: get_zashboard_tag
+        run: |
+          ZASHBOARD_REPO="Zephyruso/zashboard"
+          echo "Fetching latest release tag from $ZASHBOARD_REPO..."
+          LATEST_TAG=$(curl -sL "https://api.github.com/repos/$ZASHBOARD_REPO/releases/latest" | jq -r .tag_name)
+          if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" == "null" ]; then
+            echo "::error::Could not fetch latest tag from $ZASHBOARD_REPO or no releases found."
+            exit 1
+          fi
+          echo "Successfully fetched LATEST_TAG: $LATEST_TAG"
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+      - name: Set Build Timestamp Tag
         id: current-datetime
         run: echo "CURRENT_DATETIME=$(date +'%Y-%m-%d-%H_%M_%S%z')" >> "$GITHUB_OUTPUT"
 
-      - name: Upload artifact
+      - name: Upload build output artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-output
-          path: ./android/app/build/outputs/
+          name: build-output-${{ steps.get_metacubexd_tag.outputs.LATEST_TAG }}-${{ steps.current-datetime.outputs.CURRENT_DATETIME }}
+          path: |
+             ./android/app/build/outputs/apk/release/app-release-signed.apk
+             ./android/app/build/outputs/apk/release/output-metadata.json
+             ./android/app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
+          retention-days: 5
 
-      - name: Create Original ZIP Archive
-        run: |
-          mkdir -p build-output/apk/release
-          cp android/app/build/outputs/apk/release/app-release-signed.apk build-output/apk/release/
-          zip -r build-output.zip build-output
-
-      - name: Extract Signed APK
-        run: |
-          mkdir -p extracted_apk
-
-          cd extracted_apk
-          unzip -j ../build-output.zip 'build-output/apk/release/app-release-signed.apk'
-
-          cd ..
-          echo "APK extracted to extracted_apk/app-release-signed.apk"
-          ls -l extracted_apk/
-
-      - name: Verify build.gradle
-        run: |
-          GRADLE_FILE="android/app/build.gradle"
-          echo "Checking for Gradle file at: $GRADLE_FILE"
-          ls -l "$GRADLE_FILE"
-          echo "--- Relevant content of $GRADLE_FILE ---"
-          # Show lines around 'versionName' for context
-          grep -C 5 'versionName' "$GRADLE_FILE" || echo "INFO: 'versionName' not found via simple grep, checking file existence."
-          if [ ! -f "$GRADLE_FILE" ]; then
-              echo "ERROR: Gradle file not found or unreadable."
-          fi
-          echo "---------------------------------------"
-
-      - name: Get Version Name from Gradle
-        id: get_version_name_gradle 
-        run: |
-          GRADLE_FILE="android/app/build.gradle"
-          if [ ! -f "$GRADLE_FILE" ]; then
-            echo "::error::build.gradle file not found at $GRADLE_FILE"
-            exit 1
-          fi
-          # Extract versionName using grep and sed. Handles single or double quotes and whitespace.
-          # It looks for lines starting with 'versionName' (potentially indented)
-          VERSION_NAME=$(grep -E '^\s*versionName\s+' "$GRADLE_FILE" | sed -E 's/^\s*versionName\s+["'\'']([^"'"'"']+).*/\1/' | head -n 1)
-          # Explanation:
-          # grep -E '^\s*versionName\s+': Find lines starting with optional space, then 'versionName', then space(s).
-          # sed -E 's/^\s*versionName\s+["'\'']([^"'"'"']+).*/\1/':
-          #   ^\s*versionName\s+: Match the start and 'versionName' part.
-          #   ["'\'']: Match the opening single or double quote.
-          #   ([^"'"'"']+): Capture everything that is NOT a quote (the version name).
-          #   ["'\'']: Match the closing quote.
-          #   .*: Match the rest.
-          #   \1: Replace with the captured group (version name).
-          # head -n 1: Take only the first match if multiple lines somehow match (unlikely for versionName).
-          if [ -z "$VERSION_NAME" ]; then
-            echo "::error::Could not extract versionName from $GRADLE_FILE."
-            echo "File content around 'versionName' was:"
-            grep -C 5 'versionName' "$GRADLE_FILE" || echo "(grep found nothing)"
-            exit 1
-          fi
-          echo "Successfully extracted VERSION_NAME from Gradle: $VERSION_NAME"
-          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
-
-      - name: Rename APK
+      - name: Rename Signed APK
         id: rename_apk
         run: |
-          # Use the output from the Gradle step
-          VERSION_NAME="${{ steps.get_version_name_gradle.outputs.VERSION_NAME }}"
-          echo "Using VERSION_NAME for renaming: $VERSION_NAME" # Debug log
+          VERSION_NAME="${{ steps.get_metacubexd_tag.outputs.LATEST_TAG }}"
+          echo "Using Metacubexd LATEST_TAG for renaming: $VERSION_NAME"
           if [ -z "$VERSION_NAME" ]; then
-            echo "::error::VERSION_NAME is empty in Rename step. This should not happen."
+            echo "::error::Metacubexd LATEST_TAG is empty in Rename step."
             exit 1
           fi
-          SOURCE_APK="extracted_apk/app-release-signed.apk"
-          FINAL_APK_NAME="${VERSION_NAME}.apk" # Target name in the root directory
+          SOURCE_APK="./android/app/build/outputs/apk/release/app-release-signed.apk"
+          SANITIZED_VERSION_NAME=$(echo "$VERSION_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
+          FINAL_APK_NAME="Azlaneui-${SANITIZED_VERSION_NAME}.apk"
           if [ ! -f "$SOURCE_APK" ]; then
              echo "::error::Source APK '$SOURCE_APK' not found!"
-             echo "Contents of extracted_apk directory:"
-             ls -l extracted_apk/
+             ls -l ./android/app/build/outputs/apk/release/
              exit 1
           fi
           echo "Moving '$SOURCE_APK' to '$FINAL_APK_NAME'"
           mv "$SOURCE_APK" "$FINAL_APK_NAME"
           echo "Successfully renamed APK to $FINAL_APK_NAME"
-          echo "FINAL_APK_PATH=$FINAL_APK_NAME" >> $GITHUB_OUTPUT # Output the final path/name relative to workspace root
+          echo "FINAL_APK_PATH=$FINAL_APK_NAME" >> $GITHUB_OUTPUT
+
       - name: Verify Renamed APK
         run: |
           echo "Verifying renamed file:"
-          ls -l "${{ steps.rename_apk.outputs.FINAL_APK_PATH }}" || echo "::error::Verification failed: Renamed file not found!"
-      - name: Upload APK to Release
+          ls -l "${{ steps.rename_apk.outputs.FINAL_APK_PATH }}" || (echo "::error::Verification failed: Renamed file '${{ steps.rename_apk.outputs.FINAL_APK_PATH }}' not found!" && exit 1)
+
+      - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: latest-android 
-          name: azlaneui ${{ steps.get_version_name_gradle.outputs.VERSION_NAME }} (zash) 
+          tag_name: latest-zashboard
+          name: Azlaneui ${{ steps.get_metacubexd_tag.outputs.LATEST_TAG }} (zash)
           body: |
-            Android release ${{ steps.get_version_name_gradle.outputs.VERSION_NAME }} generated by GitHub Actions.
+            Android build corresponding to metacubexd release tag: **${{ steps.get_metacubexd_tag.outputs.LATEST_TAG }} (zash)**
+            Generated by GitHub Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             Triggered by: ${{ github.actor }}
-          files: ${{ steps.rename_apk.outputs.FINAL_APK_PATH }} 
+            Build Timestamp: ${{ steps.current-datetime.outputs.CURRENT_DATETIME }}
+          files: ${{ steps.rename_apk.outputs.FINAL_APK_PATH }}-zash
+          prerelease: false
+          draft: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
