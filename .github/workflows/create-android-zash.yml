@@ -1,5 +1,5 @@
 name: Build Android zash
-run-name: Creating Production Ready Android App 🚀 M
+run-name: Creating Production Ready Android App 🚀 Z
 on:
   workflow_dispatch:
 
